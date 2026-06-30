@@ -1,7 +1,13 @@
+
 import streamlit as st
 import pandas as pd
 
-from utils.excel_reader import leer_excel
+from utils.excel_reader import (
+    leer_excel,
+    obtener_kpis,
+    resumen_categoria,
+    top_productos
+)
 
 st.set_page_config(
     page_title="Importar Pedido",
@@ -10,160 +16,138 @@ st.set_page_config(
 )
 
 st.title("📥 Importar Pedido Diario")
-
-st.caption("Carga el Excel generado diariamente para obtener los productos, precios y cantidades solicitadas.")
-
-st.divider()
+st.caption("Carga el Excel diario de Market Donna")
 
 archivo = st.file_uploader(
     "Seleccione el archivo Excel",
     type=["xlsx"]
 )
 
-if archivo is not None:
+if archivo is None:
+    st.info("Seleccione un archivo para comenzar.")
+    st.stop()
 
-    with st.spinner("Leyendo archivo..."):
+with st.spinner("Leyendo archivo..."):
+    pedido = leer_excel(archivo)
 
-        pedido = leer_excel(archivo)
+if pedido.empty:
+    st.error("No se encontró información válida.")
+    st.stop()
 
-    if pedido.empty:
+kpis = obtener_kpis(pedido)
 
-        st.error("No se encontraron productos.")
+c1,c2,c3,c4 = st.columns(4)
 
-        st.stop()
+c1.metric("Productos",kpis["productos"])
+c2.metric("Categorías",kpis["categorias"])
+c3.metric("Cantidad",f'{kpis["cantidad"]:,.2f}')
+c4.metric("Importe",f'S/ {kpis["importe"]:,.2f}')
 
-    # ---------------- KPIs ----------------
+st.divider()
 
-    productos = len(pedido)
-
-    categorias = pedido["Categoria"].nunique()
-
-    precio_promedio = pedido["Precio"].mean()
-
-    total_productos = pedido["Total Pedido"].sum()
-
-    c1,c2,c3,c4 = st.columns(4)
-
-    c1.metric(
-        "Productos",
-        productos
-    )
-
-    c2.metric(
-        "Categorías",
-        categorias
-    )
-
-    c3.metric(
-        "Precio Promedio",
-        f"S/ {precio_promedio:.2f}"
-    )
-
-    c4.metric(
-        "Cantidad Solicitada",
-        f"{total_productos:,.2f}"
-    )
-
-    st.divider()
-
-    # ---------------- BUSCADOR ----------------
-    st.subheader("Resumen por Categoría")
-    
-    resumen = (
-        pedido
-        .groupby("Categoria")
-        .agg(
-            Productos=("Producto", "count"),
-            Cantidad=("Total Pedido", "sum")
-        )
-    )
-    
-    st.dataframe(
-        resumen,
-        use_container_width=True
-    )
-     
-        
-
-    buscar = st.text_input(
-        "🔍 Buscar producto"
-    )
-
-    tabla = pedido.copy()
-    tabla = tabla.sort_values(
-    by="Categoria"
+st.subheader("Resumen por categoría")
+st.dataframe(
+    resumen_categoria(pedido),
+    use_container_width=True,
+    hide_index=True
 )
 
-    if buscar:
+st.divider()
 
-        tabla = tabla[
-            tabla["Producto"]
-            .str.contains(
-                buscar,
-                case=False,
-                na=False
-            )
-        ]
+buscar = st.text_input("🔍 Buscar producto")
 
-    # ---------------- FILTRO ----------------
+tabla = pedido.copy()
 
-    categoria = st.selectbox(
-
-        "Categoría",
-
-        ["Todas"] + sorted(
-            pedido["Categoria"].unique()
+if buscar:
+    tabla = tabla[
+        tabla["Producto"].astype(str).str.contains(
+            buscar,
+            case=False,
+            na=False
         )
+    ]
 
-    )
+categorias = ["Todas"] + sorted(tabla["Categoria"].unique().tolist())
 
-    if categoria != "Todas":
+categoria = st.selectbox(
+    "Categoría",
+    categorias
+)
 
-        tabla = tabla[
-            tabla["Categoria"] == categoria
+if categoria != "Todas":
+    tabla = tabla[
+        tabla["Categoria"] == categoria
+    ]
+
+st.divider()
+
+tabs = st.tabs([
+    "🥔 LEGUMBRES",
+    "🌿 HIERBAS",
+    "🍎 FRUTA"
+])
+
+mapa = {
+    "🥔 LEGUMBRES":"LEGUMBRES",
+    "🌿 HIERBAS":"HIERBAS",
+    "🍎 FRUTA":"FRUTA"
+}
+
+for tab,nombre in zip(tabs,mapa.keys()):
+    with tab:
+        df = tabla[
+            tabla["Categoria"] == mapa[nombre]
         ]
 
-    st.divider()
+        if df.empty:
+            st.warning("No hay registros.")
+        else:
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                height=450
+            )
+
+st.divider()
+
+col1,col2 = st.columns([2,1])
+
+with col1:
+    st.subheader("Top productos solicitados")
 
     st.dataframe(
-
-        tabla,
-
+        top_productos(pedido)[
+            ["Producto","Categoria","Precio","Total Pedido","Importe"]
+        ],
         use_container_width=True,
-
-        hide_index=True,
-
-        height=600
-
+        hide_index=True
     )
 
-    st.divider()
+with col2:
 
-    col1,col2,col3 = st.columns([1,1,5])
+    st.subheader("Acciones")
 
-    with col1:
-
-        st.button(
-            "💾 Guardar Pedido",
-            use_container_width=True
+    if st.button(
+        "💾 Guardar Pedido",
+        use_container_width=True
+    ):
+        st.success(
+            "Próximamente se guardará en la base de datos."
         )
 
-    with col2:
+    csv = pedido.to_csv(
+        index=False
+    ).encode("utf-8-sig")
 
-        csv = tabla.to_csv(
-            index=False
-        ).encode("utf-8-sig")
+    st.download_button(
+        "📥 Descargar CSV",
+        csv,
+        file_name="pedido_importado.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
-        st.download_button(
+st.divider()
 
-            "📥 CSV",
-
-            csv,
-
-            "pedido.csv",
-
-            "text/csv",
-
-            use_container_width=True
-
-        )
+st.success("✅ Pedido importado correctamente.")
