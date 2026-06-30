@@ -29,6 +29,7 @@ if archivo is None:
 
 with st.spinner("Leyendo archivo..."):
     pedido = leer_excel(archivo)
+    st.session_state["pedido"] = pedido
 
 if pedido.empty:
     st.error("No se encontró información válida.")
