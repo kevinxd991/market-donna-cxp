@@ -1,9 +1,5 @@
 import streamlit as st
 
-# ---------------------------------------------------
-# CONFIGURACIÓN GENERAL
-# ---------------------------------------------------
-
 st.set_page_config(
     page_title="Market Donna ERP",
     page_icon="🏪",
@@ -11,112 +7,63 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------
-# CSS PERSONALIZADO
-# ---------------------------------------------------
+# ============================
+# CSS
+# ============================
 
 st.markdown("""
 <style>
 
 .block-container{
-    padding-top:1.5rem;
-    padding-bottom:1rem;
+    padding-top:1.2rem;
 }
 
-h1,h2,h3{
-    color:#1f2937;
+h1{
+    color:#1E3A8A;
 }
 
 div[data-testid="stMetric"]{
-    background-color:white;
+    background:white;
+    border-radius:12px;
     border:1px solid #E5E7EB;
     padding:18px;
-    border-radius:15px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+    box-shadow:0px 2px 8px rgba(0,0,0,.08);
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",unsafe_allow_html=True)
 
-# ---------------------------------------------------
-# ENCABEZADO
-# ---------------------------------------------------
+# ============================
 
-col1,col2 = st.columns([1,6])
+st.title("🏪 Market Donna ERP")
 
-with col1:
-    st.image(
-        "https://img.icons8.com/color/96/shop.png",
-        width=70
-    )
-
-with col2:
-
-    st.title("🏪 Market Donna ERP")
-
-    st.caption(
-        "Sistema de Gestión de Compras y Cuentas por Pagar a Proveedores"
-    )
+st.caption("Sistema Inteligente de Gestión de Compras y Cuentas por Pagar")
 
 st.divider()
 
-# ---------------------------------------------------
-# MENSAJE DE BIENVENIDA
-# ---------------------------------------------------
+st.success("Bienvenido al sistema.")
 
-st.success("✅ Bienvenido al sistema.")
-
-st.write("""
-
+st.markdown("""
 Este sistema permitirá administrar:
 
+- 📥 Importación automática del pedido diario
 - 🏪 Proveedores
-- 📦 Productos
-- 📥 Importación de pedidos desde Excel
 - 🛒 Compras
 - 🧾 Facturas
 - 💰 Cuentas por pagar
 - 💳 Pagos
 - 📊 Reportes
 
-Utilice el menú lateral para acceder a cada módulo.
-
+Seleccione un módulo desde el menú lateral.
 """)
 
 st.divider()
 
-# ---------------------------------------------------
-# KPIs TEMPORALES
-# ---------------------------------------------------
+c1,c2,c3,c4=st.columns(4)
 
-st.subheader("Resumen General")
+c1.metric("Productos","0")
+c2.metric("Pedidos","0")
+c3.metric("Proveedores","0")
+c4.metric("Deuda","S/0.00")
 
-col1,col2,col3,col4 = st.columns(4)
-
-with col1:
-    st.metric(
-        "💰 Deuda Total",
-        "S/ 0.00"
-    )
-
-with col2:
-    st.metric(
-        "🧾 Facturas Pendientes",
-        "0"
-    )
-
-with col3:
-    st.metric(
-        "💳 Pagado este mes",
-        "S/ 0.00"
-    )
-
-with col4:
-    st.metric(
-        "🏪 Proveedores",
-        "0"
-    )
-
-st.divider()
-
-st.info("📌 Próximamente aquí se mostrará el Dashboard con gráficos en tiempo real.")
+st.info("Comience importando el pedido diario desde Excel.")
