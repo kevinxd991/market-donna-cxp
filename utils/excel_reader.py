@@ -1,5 +1,9 @@
 import pandas as pd
 
+# ==========================================
+# HOJAS QUE SE IMPORTARÁN
+# ==========================================
+
 HOJAS_VALIDAS = [
     "LEGUMBRES-PEDIDO",
     "HIERBAS-PEDIDO",
@@ -7,43 +11,61 @@ HOJAS_VALIDAS = [
 ]
 
 
-def leer_excel(file):
+def leer_excel(archivo):
+    """
+    Lee el Excel de pedidos y devuelve un DataFrame unificado.
+    """
 
-    excel = pd.ExcelFile(file)
+    excel = pd.ExcelFile(archivo)
 
-    data = []
+    datos = []
 
     for hoja in excel.sheet_names:
 
         if hoja not in HOJAS_VALIDAS:
             continue
 
-        df = pd.read_excel(
-            file,
-            sheet_name=hoja,
-            header=4
+        try:
+
+            df = pd.read_excel(
+                archivo,
+                sheet_name=hoja,
+                header=4
+            )
+
+        except Exception:
+            continue
+
+        # -----------------------------
+        # Limpiar nombres de columnas
+        # -----------------------------
+
+        df.columns = (
+            df.columns
+            .astype(str)
+            .str.strip()
+            .str.upper()
         )
 
-        df.columns = df.columns.astype(str).str.strip()
-
         # -----------------------------
-        # Buscar columnas importantes
+        # Buscar columnas principales
         # -----------------------------
 
-        producto = None
-        costo = None
+        columna_producto = None
+        columna_precio = None
 
-        for c in df.columns:
+        for columna in df.columns:
 
-            nombre = c.upper()
+            if "PRODUCTO" in columna:
+                columna_producto = columna
 
-            if "PRODUCTO" in nombre:
-                producto = c
+            if "COSTO" in columna:
+                columna_precio = columna
 
-            if "COSTO" in nombre:
-                costo = c
+        if columna_producto is None:
+            continue
 
-        if producto is None or costo is None:
+        if columna_precio is None:
             continue
 
         # -----------------------------
@@ -58,12 +80,13 @@ def leer_excel(file):
             "PRODUCTO",
             "COSTO",
             "TOTAL",
-            "U.M."
+            "U.M.",
+            "UM"
         ]
 
-        for c in df.columns:
+        for columna in df.columns:
 
-            nombre = c.upper()
+            nombre = columna.upper()
 
             if any(x in nombre for x in ignorar):
                 continue
@@ -71,38 +94,154 @@ def leer_excel(file):
             if "UNNAMED" in nombre:
                 continue
 
-            columnas_tiendas.append(c)
+            columnas_tiendas.append(columna)
 
+        # -----------------------------
+        # Recorrer productos
         # -----------------------------
 
         for _, fila in df.iterrows():
 
-            if pd.isna(fila[producto]):
+            producto = fila[columna_producto]
+
+            if pd.isna(producto):
+                continue
+
+            if str(producto).strip() == "":
                 continue
 
             registro = {}
 
             registro["Categoria"] = hoja.replace("-PEDIDO", "")
 
-            registro["Producto"] = fila[producto]
+            registro["Producto"] = str(producto).strip()
 
-            registro["Precio"] = fila[costo]
+            try:
+                registro["Precio"] = float(fila[columna_precio])
+            except:
+                registro["Precio"] = 0
 
             total = 0
+
+            # Guardar cantidad por tienda
 
             for tienda in columnas_tiendas:
 
                 try:
-                    valor = float(fila[tienda])
+                    cantidad = float(fila[tienda])
+
+                    if pd.isna(cantidad):
+                        cantidad = 0
+
                 except:
-                    valor = 0
+                    cantidad = 0
 
-                registro[tienda] = valor
+                registro[tienda.title()] = cantidad
 
-                total += valor
+                total += cantidad
 
             registro["Total Pedido"] = total
 
-            data.append(registro)
+            registro["Importe"] = round(
+                total * registro["Precio"],
+                2
+            )
 
-    return pd.DataFrame(data)
+            datos.append(registro)
+
+    if len(datos) == 0:
+        return pd.DataFrame()
+
+    pedido = pd.DataFrame(datos)
+
+    pedido = pedido.fillna(0)
+
+    pedido = pedido.sort_values(
+        ["Categoria", "Producto"]
+    )
+
+    pedido.reset_index(
+        drop=True,
+        inplace=True
+    )
+
+    return pedido
+
+
+# ==========================================
+# KPIs
+# ==========================================
+
+def obtener_kpis(df):
+
+    if df.empty:
+
+        return {
+            "productos": 0,
+            "categorias": 0,
+            "cantidad": 0,
+            "importe": 0
+        }
+
+    return {
+
+        "productos": len(df),
+
+        "categorias": df["Categoria"].nunique(),
+
+        "cantidad": df["Total Pedido"].sum(),
+
+        "importe": df["Importe"].sum()
+
+    }
+
+
+# ==========================================
+# RESUMEN POR CATEGORÍA
+# ==========================================
+
+def resumen_categoria(df):
+
+    if df.empty:
+        return pd.DataFrame()
+
+    return (
+
+        df.groupby("Categoria")
+
+        .agg(
+
+            Productos=("Producto", "count"),
+
+            Cantidad=("Total Pedido", "sum"),
+
+            Importe=("Importe", "sum")
+
+        )
+
+        .reset_index()
+
+    )
+
+
+# ==========================================
+# TOP PRODUCTOS
+# ==========================================
+
+def top_productos(df, cantidad=10):
+
+    if df.empty:
+        return pd.DataFrame()
+
+    return (
+
+        df
+
+        .sort_values(
+            "Total Pedido",
+            ascending=False
+        )
+
+        .head(cantidad)
+
+    )
