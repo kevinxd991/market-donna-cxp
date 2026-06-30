@@ -67,6 +67,23 @@ if archivo is not None:
     st.divider()
 
     # ---------------- BUSCADOR ----------------
+    st.subheader("Resumen por Categoría")
+    
+    resumen = (
+        pedido
+        .groupby("Categoria")
+        .agg(
+            Productos=("Producto", "count"),
+            Cantidad=("Total Pedido", "sum")
+        )
+    )
+    
+    st.dataframe(
+        resumen,
+        use_container_width=True
+    )
+     
+        
 
     buscar = st.text_input(
         "🔍 Buscar producto"
