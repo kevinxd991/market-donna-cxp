@@ -9,93 +9,100 @@ HOJAS_VALIDAS = [
 
 def leer_excel(file):
 
-    pedidos=[]
+    excel = pd.ExcelFile(file)
 
-    excel=pd.ExcelFile(file)
+    data = []
 
-    hojas=[h for h in excel.sheet_names if h in HOJAS_VALIDAS]
+    for hoja in excel.sheet_names:
 
-    for hoja in hojas:
+        if hoja not in HOJAS_VALIDAS:
+            continue
 
-        df=pd.read_excel(
+        df = pd.read_excel(
             file,
             sheet_name=hoja,
             header=4
         )
 
-        df.columns=df.columns.astype(str).str.strip()
+        df.columns = df.columns.astype(str).str.strip()
 
-        columnas=list(df.columns)
+        # -----------------------------
+        # Buscar columnas importantes
+        # -----------------------------
 
-        producto=None
-        costo=None
+        producto = None
+        costo = None
 
-        for c in columnas:
+        for c in df.columns:
 
-            texto=c.upper()
+            nombre = c.upper()
 
-            if "PRODUCTO" in texto:
-                producto=c
+            if "PRODUCTO" in nombre:
+                producto = c
 
-            if "COSTO" in texto:
-                costo=c
+            if "COSTO" in nombre:
+                costo = c
 
-        if producto is None:
+        if producto is None or costo is None:
             continue
 
-        if costo is None:
-            continue
+        # -----------------------------
+        # Detectar columnas de tiendas
+        # -----------------------------
 
-        columnas_pedido=[]
+        columnas_tiendas = []
 
-        ignorar=[
-            "PRODUCTO",
-            "COSTO",
+        ignorar = [
             "CODIGO",
             "CÓDIGO",
-            "U.M.",
-            "TOTAL"
+            "PRODUCTO",
+            "COSTO",
+            "TOTAL",
+            "U.M."
         ]
 
-        for c in columnas:
+        for c in df.columns:
 
-            nombre=c.upper()
+            nombre = c.upper()
 
             if any(x in nombre for x in ignorar):
                 continue
 
-            if "Unnamed" in c:
+            if "UNNAMED" in nombre:
                 continue
 
-            columnas_pedido.append(c)
+            columnas_tiendas.append(c)
 
-        for _,fila in df.iterrows():
+        # -----------------------------
+
+        for _, fila in df.iterrows():
 
             if pd.isna(fila[producto]):
                 continue
 
-            total=0
+            registro = {}
 
-            for col in columnas_pedido:
+            registro["Categoria"] = hoja.replace("-PEDIDO", "")
+
+            registro["Producto"] = fila[producto]
+
+            registro["Precio"] = fila[costo]
+
+            total = 0
+
+            for tienda in columnas_tiendas:
 
                 try:
-                    valor=float(fila[col])
-
+                    valor = float(fila[tienda])
                 except:
-                    valor=0
+                    valor = 0
 
-                total+=valor
+                registro[tienda] = valor
 
-            pedidos.append({
+                total += valor
 
-                "Categoria":hoja.replace("-PEDIDO",""),
+            registro["Total Pedido"] = total
 
-                "Producto":fila[producto],
+            data.append(registro)
 
-                "Precio":fila[costo],
-
-                "Pedido":total
-
-            })
-
-    return pd.DataFrame(pedidos)
+    return pd.DataFrame(data)
