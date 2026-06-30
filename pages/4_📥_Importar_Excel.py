@@ -40,7 +40,7 @@ if archivo is not None:
 
     precio_promedio = pedido["Precio"].mean()
 
-    total_productos = pedido["Pedido"].sum()
+    total_productos = pedido["Total Pedido"].sum()
 
     c1,c2,c3,c4 = st.columns(4)
 
@@ -73,6 +73,9 @@ if archivo is not None:
     )
 
     tabla = pedido.copy()
+    tabla = tabla.sort_values(
+    by="Categoria"
+)
 
     if buscar:
 
